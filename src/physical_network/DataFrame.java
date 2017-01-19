@@ -27,6 +27,7 @@ public class DataFrame {
 	private int destination = 0;
 	private int source;
 	private int ack = 0;
+	private int sequence = 0;
 		
 	public DataFrame(String payload) {
 		this.payload = payload.getBytes();
@@ -67,10 +68,12 @@ public class DataFrame {
 		int source = byteArray[1];
 		// CheckSum bytes 2 and 3
 		int ack = byteArray[4];
-		byte[] payload = Arrays.copyOfRange(byteArray, 5, byteArray.length);
+		int seq = byteArray[5];
+		byte[] payload = Arrays.copyOfRange(byteArray, 6, byteArray.length);
 
 		DataFrame created = new DataFrame(payload, dest);
 		created.setSource(source);
+		created.setSequence(seq);
 		if(ack == 1) created.makeAcknowledgement();
 		
 		return created;
@@ -96,7 +99,8 @@ public class DataFrame {
 		byte[] tempHead = {
 				(byte) (destination & 0xFF),
 				(byte) (source & 0xFF),
-				(byte) (ack & 0xFF)
+				(byte) (ack & 0xFF),
+				(byte) (sequence & 0xFF)
 		};
 
 		byte[] temp = new byte[tempHead.length + payload.length];
@@ -111,7 +115,8 @@ public class DataFrame {
 				(byte) (source & 0xFF),
 				checksum[0],
 				checksum[1],
-				(byte) (ack & 0xFF)
+				(byte) (ack & 0xFF),
+				(byte) (sequence & 0xFF)
 		};
 
 		return header;
@@ -179,6 +184,13 @@ public class DataFrame {
 		System.arraycopy(payload, 0, transmittedBytes, header.length, payload.length);
 
 		return transmittedBytes;
-	}	
-	
+	}
+
+	public void setSequence(int sequence) {
+		this.sequence = sequence;
+	}
+
+	public int getSequence() {
+		return this.sequence;
+	}
 }

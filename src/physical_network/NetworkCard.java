@@ -58,6 +58,8 @@ public class NetworkCard {
     private Thread rxThread;
 
 	private boolean ackReceived = false;
+
+	private int sequenceNo = 1;
     
     /**
      * NetworkCard constructor.
@@ -94,6 +96,10 @@ public class NetworkCard {
     	return data;
     }
 
+    public void updateSequenceNo() {
+		this.sequenceNo = (this.sequenceNo + 1) % 2;
+	}
+
 
     /*
      * Private inner thread class that transmits data.
@@ -109,6 +115,9 @@ public class NetworkCard {
 	    			DataFrame frame = outputQueue.take();
 					// Set source number
 					frame.setSource(deviceNumber);
+					updateSequenceNo();
+					frame.setSequence(sequenceNo);
+
 	    			transmitFrame(frame);
 	    		}
     		} catch (InterruptedException except) {
@@ -125,7 +134,7 @@ public class NetworkCard {
          */
         public void transmitFrame(DataFrame frame) throws InterruptedException {
     		if (frame != null) {
-    			
+    			System.out.println("\nSeuenceNo at the start of transmitFrame: " + sequenceNo + "\n");
     			// Low voltage signal to get ready ...
     			wire.setVoltage(deviceName, LOW_VOLTAGE);
     			sleep(PULSE_WIDTH*4);
@@ -150,14 +159,12 @@ public class NetworkCard {
 
 				if(!frame.isAcknowledgement()) {
 					ackReceived = false;
-					System.out.println("Waiting for ACK");
 
 					long start = System.currentTimeMillis();
 
 					// Wait a minute
-					while(System.currentTimeMillis() - start < ((8 * (8+5) * PULSE_WIDTH) + 5 * 1000)) {
+					while(System.currentTimeMillis() - start < ((8 * (8+6) * PULSE_WIDTH) + 6 * 1000)) {
 						if (ackReceived) {
-							System.out.println("Break, ack has been received: " + deviceName);
 							break;
 						}
 					}
@@ -243,7 +250,7 @@ public class NetworkCard {
 					DataFrame df = DataFrame.createFromReceivedBytes(Arrays.copyOfRange(bytePayload, 0, bytePayloadIndex));
 
 					byte[] csum = DataFrame.calcChecksum(bytePayload);
-
+					System.out.println("\nsequenceNo in receive thread: " + sequenceNo + "\n");
 					if(DataFrame.confirmChecksum(csum)) {
 						System.out.println("Congrats, the data frame was not corrupted!");
 						if(df.getDestination() != deviceNumber) {
@@ -254,14 +261,18 @@ public class NetworkCard {
 								System.out.println("Setting ackReceived to true");
 								ackReceived = true;
 							} else {
+								if(df.getSequence() == sequenceNo) {
+									updateSequenceNo();
+									inputQueue.put(df);
+								} else {
+									System.out.println("Repeat frame at " + deviceName + ". Discarding");
+								}
 								// Send acknowledgement
 								DataFrame ack = new DataFrame("", df.getSource());
 								ack.makeAcknowledgement();
 								System.out.println(deviceName + " sending ACK");
 								outputQueue.put(ack);
 							}
-							// Process the frame
-							inputQueue.put(df);
 						}
 					} else {
 						System.out.println("I'm afraid to say that your data frame became corrupted");
