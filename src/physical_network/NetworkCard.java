@@ -155,7 +155,7 @@ public class NetworkCard {
 					long start = System.currentTimeMillis();
 
 					// Wait a minute
-					while(System.currentTimeMillis() - start < (60 * 1000)) {
+					while(System.currentTimeMillis() - start < ((8 * (8+5) * PULSE_WIDTH) + 5 * 1000)) {
 						if (ackReceived) {
 							System.out.println("Break, ack has been received: " + deviceName);
 							break;
@@ -176,6 +176,7 @@ public class NetworkCard {
     	private void transmitByte(byte value) throws InterruptedException {
 
     		// Low voltage signal ...
+			wire.setVoltage("test", 0);
     		wire.setVoltage(deviceName, LOW_VOLTAGE);
     		sleep(PULSE_WIDTH*4);
 
@@ -217,24 +218,7 @@ public class NetworkCard {
 	    			byte[] bytePayload = new byte[MAX_PAYLOAD_SIZE];
 	    			int bytePayloadIndex = 0;
 		    		byte receivedByte;
-//	        		do {
-//
-//	        			receivedByte = receiveByte();
-//
-//	        			System.out.println(deviceName + " RECEIVED BYTE = " + Integer.toHexString(receivedByte & 0xFF));
-//
-//	        			if ((receivedByte & 0xFF) != 0x7E) {
-//	            			// Unstuff if escaped.
-//		        			if (receivedByte == 0x7D) {
-//		        				receivedByte = receiveByte();
-//		        				System.out.println(deviceName + " ESCAPED RECEIVED BYTE = " + Integer.toHexString(receivedByte & 0xFF));
-//		        			}
-//
-//		        			bytePayload[bytePayloadIndex] = receivedByte;
-//		        			bytePayloadIndex++;
-//	        			}
-//
-//	        		} while ((receivedByte & 0xFF) != 0x7E);
+
 					// Timur's fix to prevent the break of the loop when a ~ is encountered in the received string
 					while (true) {
 						receivedByte = receiveByte();
@@ -255,13 +239,15 @@ public class NetworkCard {
 						bytePayloadIndex++;
 
 					}
+
 					DataFrame df = DataFrame.createFromReceivedBytes(Arrays.copyOfRange(bytePayload, 0, bytePayloadIndex));
-	        		// Block receiving data if queue full.
 
 					byte[] csum = DataFrame.calcChecksum(bytePayload);
+
 					if(DataFrame.confirmChecksum(csum)) {
 						System.out.println("Congrats, the data frame was not corrupted!");
 						if(df.getDestination() != deviceNumber) {
+							wire.setVoltage("test", LOW_VOLTAGE);
 							System.out.println(deviceName + " is discarding packet");
 						} else {
 							if(df.isAcknowledgement()) {
@@ -269,7 +255,7 @@ public class NetworkCard {
 								ackReceived = true;
 							} else {
 								// Send acknowledgement
-								DataFrame ack = new DataFrame("ACK", df.getSource());
+								DataFrame ack = new DataFrame("", df.getSource());
 								ack.makeAcknowledgement();
 								System.out.println(deviceName + " sending ACK");
 								outputQueue.put(ack);
@@ -279,6 +265,7 @@ public class NetworkCard {
 						}
 					} else {
 						System.out.println("I'm afraid to say that your data frame became corrupted");
+						wire.setVoltage("test", LOW_VOLTAGE);
 					}
 
 	    		}
