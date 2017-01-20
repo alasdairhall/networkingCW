@@ -59,7 +59,7 @@ public class NetworkCard {
 
 	private boolean ackReceived = false;
 
-	private int sequenceNo = 1;
+	private int sequenceNo = 0;
     
     /**
      * NetworkCard constructor.
@@ -115,10 +115,11 @@ public class NetworkCard {
 	    			DataFrame frame = outputQueue.take();
 					// Set source number
 					frame.setSource(deviceNumber);
-					updateSequenceNo();
+
 					frame.setSequence(sequenceNo);
 
 	    			transmitFrame(frame);
+					updateSequenceNo();
 	    		}
     		} catch (InterruptedException except) {
     			System.out.println(deviceName + " Transmitter Thread Interrupted - terminated.");
@@ -134,7 +135,7 @@ public class NetworkCard {
          */
         public void transmitFrame(DataFrame frame) throws InterruptedException {
     		if (frame != null) {
-    			System.out.println("\nSeuenceNo at the start of transmitFrame: " + sequenceNo + "\n");
+//    			System.out.println("\nSeuenceNo at the start of transmitFrame: " + sequenceNo + "\n");
     			// Low voltage signal to get ready ...
     			wire.setVoltage(deviceName, LOW_VOLTAGE);
     			sleep(PULSE_WIDTH*4);
@@ -250,32 +251,32 @@ public class NetworkCard {
 					DataFrame df = DataFrame.createFromReceivedBytes(Arrays.copyOfRange(bytePayload, 0, bytePayloadIndex));
 
 					byte[] csum = DataFrame.calcChecksum(bytePayload);
-					System.out.println("\nsequenceNo in receive thread: " + sequenceNo + "\n");
+//					System.out.println("\n" + deviceName + " sequenceNo in receive thread: " + sequenceNo + "\n");
 					if(DataFrame.confirmChecksum(csum)) {
-						System.out.println("Congrats, the data frame was not corrupted!");
+//						System.out.println("Congrats, the data frame was not corrupted!");
 						if(df.getDestination() != deviceNumber) {
 							wire.setVoltage("test", LOW_VOLTAGE);
-							System.out.println(deviceName + " is discarding packet");
+//							System.out.println(deviceName + " is discarding packet");
 						} else {
 							if(df.isAcknowledgement()) {
-								System.out.println("Setting ackReceived to true");
+//								System.out.println("Setting ackReceived to true");
 								ackReceived = true;
 							} else {
 								if(df.getSequence() == sequenceNo) {
-									updateSequenceNo();
+//									updateSequenceNo();
 									inputQueue.put(df);
 								} else {
-									System.out.println("Repeat frame at " + deviceName + ". Discarding");
+//									System.out.println("Repeat frame at " + deviceName + ". Discarding");
 								}
 								// Send acknowledgement
 								DataFrame ack = new DataFrame("", df.getSource());
 								ack.makeAcknowledgement();
-								System.out.println(deviceName + " sending ACK");
+//								System.out.println(deviceName + " sending ACK");
 								outputQueue.put(ack);
 							}
 						}
 					} else {
-						System.out.println("I'm afraid to say that your data frame became corrupted");
+//						System.out.println("I'm afraid to say that your data frame became corrupted");
 						wire.setVoltage("test", LOW_VOLTAGE);
 					}
 
